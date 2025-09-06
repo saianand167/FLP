@@ -165,7 +165,7 @@ CLASS_LOCATIONS = {
         "lon": 80.8228997
     }
 }
-# Using a larger radius for testing based on your previous logs. Adjust as needed.
+# Using a larger radius for testing based on your previous logs. Adjust as needed.hlo
 LOCATION_RADIUS_METERS = 38061 
 
 REFERENCE_IMG_PATH = "reference.jpg"
