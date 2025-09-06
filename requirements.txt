@@ -5,6 +5,6 @@ gunicorn
 haversine
 opencv-python
 deepface
-tf_keras
-keras==2.15.0
-tensorflow==2.15.0
+tf-keras
+keras==2.13.1
+tensorflow==2.13.0
