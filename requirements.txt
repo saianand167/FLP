@@ -1,0 +1,8 @@
+# requirements.txt
+Flask
+Flask-Cors
+gunicorn
+deepface
+haversine
+tensorflow # deepface often needs this explicitly
+opencv-python

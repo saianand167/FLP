@@ -1,0 +1,210 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance System</title>
+    <style>
+        /* --- General Resets & Body Styling --- */
+        :root {
+            --primary-color: #007bff;
+            --primary-hover: #0056b3;
+            --success-color: #28a745;
+            --error-color: #dc3545;
+            --light-gray: #f0f2f5;
+            --dark-gray: #333;
+            --medium-gray: #555;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background-color: var(--light-gray); padding: 15px; }
+        .container { text-align: center; padding: 30px; background-color: white; border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,0.08); width: 100%; max-width: 500px; }
+        h1 { color: var(--dark-gray); margin-bottom: 10px; font-size: 1.8rem; }
+        p { color: var(--medium-gray); line-height: 1.6; margin-bottom: 20px; }
+        button { background-color: var(--primary-color); color: white; border: none; padding: 15px 30px; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: all 0.3s; width: 100%; }
+        button:hover:not(:disabled) { background-color: var(--primary-hover); box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3); }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        #status { margin-top: 25px; font-size: 1.1em; font-weight: bold; line-height: 1.5; min-height: 70px; }
+        #status small { display: block; margin-top: 5px; font-weight: normal; color: #6c757d; font-size: 0.85em; }
+        .success { color: var(--success-color); }
+        .error { color: var(--error-color); }
+        .hidden { display: none; }
+        #video-container { margin-top: 20px; position: relative; }
+        video { width: 100%; max-width: 400px; border-radius: 8px; background-color: #000; }
+        canvas { display: none; }
+        .spinner { border: 4px solid rgba(0,0,0,0.1); border-left-color: var(--primary-color); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto 0; }
+        @keyframes spin { to { transform: rotate(30deg); } }
+        @media (min-width: 600px) { h1 { font-size: 2.2rem; } .container { padding: 40px; } button { width: auto; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Smart Attendance</h1>
+        
+        <!-- Step 1: Location -->
+        <div id="location-step">
+            <p>Verify your location for class <strong>CS101</strong> to proceed.</p>
+            <button id="location-button" onclick="verifyLocation()">Step 1: Verify My Location</button>
+        </div>
+
+        <!-- Step 2: Face Recognition -->
+        <div id="face-step" class="hidden">
+            <p>Location confirmed. Please align your face with the camera.</p>
+            <div id="video-container">
+                <video id="webcam" autoplay playsinline></video>
+                <canvas id="canvas"></canvas>
+            </div>
+            <button id="face-button" onclick="verifyFace()">Step 2: Capture & Verify Face</button>
+        </div>
+        
+        <!-- Status Area -->
+        <div id="status-container">
+             <div id="spinner" class="spinner hidden"></div>
+             <p id="status"></p>
+        </div>
+    </div>
+
+    <script>
+        // --- API & Config ---
+        const LOCATION_API = "/verify-location";
+        const FACE_API = "/verify-face";
+
+        // --- Element References ---
+        const statusElement = document.getElementById('status');
+        const spinner = document.getElementById('spinner');
+        const locationButton = document.getElementById('location-button');
+        const faceButton = document.getElementById('face-button');
+        const locationStepDiv = document.getElementById('location-step');
+        const faceStepDiv = document.getElementById('face-step');
+        const videoElement = document.getElementById('webcam');
+        let stream;
+
+        // --- UI Helper Functions ---
+        function showSpinner() { spinner.classList.remove('hidden'); }
+        function hideSpinner() { spinner.classList.add('hidden'); }
+        function updateStatus(message, type = '') {
+            hideSpinner();
+            statusElement.innerHTML = message;
+            statusElement.className = type;
+        }
+        function showLoadingStatus(message) {
+            showSpinner();
+            statusElement.innerHTML = message;
+            statusElement.className = '';
+        }
+        
+        // --- STEP 1: Location Logic ---
+        async function verifyLocation() {
+            if (!navigator.geolocation) {
+                updateStatus("Geolocation is not supported by your browser.", "error");
+                return;
+            }
+            locationButton.disabled = true;
+            showLoadingStatus("Acquiring your location...");
+            try {
+                // Call the new, faster location function
+                const position = await getFastLocation();
+                await sendLocationToServer(position);
+            } catch (error) {
+                updateStatus(`Error: ${error.message}`, "error");
+                locationButton.disabled = false;
+            }
+        }
+        
+        /**
+         * MODIFIED FUNCTION: Gets location quickly without waiting for accuracy.
+         * It asks for the location once and has a timeout if it takes too long.
+         */
+        function getFastLocation() {
+            return new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(
+                    // Success: The browser found the location
+                    (position) => {
+                        resolve(position);
+                    },
+                    // Error: The browser failed to get the location
+                    (error) => {
+                        reject(new Error(error.message));
+                    },
+                    // Options
+                    {
+                        enableHighAccuracy: true, // Prefer GPS if available
+                        timeout: 5000,           // Maximum time to wait: 5 seconds
+                        maximumAge: 0            // Force a fresh location check
+                    }
+                );
+            });
+        }
+
+        async function sendLocationToServer(position) {
+            const { latitude, longitude, accuracy } = position.coords;
+            showLoadingStatus(`Location found (Accuracy: ${accuracy.toFixed(1)}m).<br><small>Verifying coordinates...</small>`);
+            try {
+                const response = await fetch(LOCATION_API, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ class_id: "CS101", latitude, longitude })
+                });
+                const result = await response.json();
+                if (response.ok && result.status === 'success') {
+                    updateStatus(result.message, "success");
+                    setTimeout(proceedToFaceStep, 1000);
+                } else {
+                    updateStatus(result.message || "Failed to verify location.", "error");
+                    locationButton.disabled = false;
+                }
+            } catch (error) {
+                updateStatus("Could not connect to the verification server.", "error");
+                locationButton.disabled = false;
+            }
+        }
+        
+        // --- STEP 2: Face Logic (No changes needed here) ---
+        async function proceedToFaceStep() {
+            locationStepDiv.classList.add('hidden');
+            faceStepDiv.classList.remove('hidden');
+            updateStatus("Please look at the camera for face verification.");
+
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+                videoElement.srcObject = stream;
+            } catch (error) {
+                updateStatus("Could not access the camera. Please grant permission and try again.", "error");
+                faceButton.disabled = true;
+            }
+        }
+
+        async function verifyFace() {
+            faceButton.disabled = true;
+            const canvas = document.getElementById('canvas');
+            canvas.width = videoElement.videoWidth;
+            canvas.height = videoElement.videoHeight;
+            canvas.getContext('2d').drawImage(videoElement, 0, 0);
+
+            if (stream) { stream.getTracks().forEach(track => track.stop()); }
+            
+            showLoadingStatus("Image captured. Sending for verification...");
+            const imageDataUrl = canvas.toDataURL('image/jpeg');
+
+            try {
+                const response = await fetch(FACE_API, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageDataUrl })
+                });
+                const result = await response.json();
+                if (response.ok && result.status === 'success') {
+                    updateStatus("✅ Attendance Marked Successfully!", "success");
+                    faceButton.classList.add('hidden');
+                } else {
+                    updateStatus(`❌ ${result.message || "Face verification failed."}<br><small>Please refresh to try again.</small>`, "error");
+                }
+            } catch (error) {
+                updateStatus("Connection error during face verification.", "error");
+                faceButton.disabled = false;
+            }
+        }
+    </script>
+
+</body>
+</html>
