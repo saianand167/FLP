@@ -9,3 +9,15 @@ tf-keras
 keras==2.13.1
 tensorflow==2.13.0
 numpy
+
+
+# Flask
+# Flask-Cors
+# gunicorn
+# haversine
+# opencv-python
+# deepface
+# tf-keras
+# keras==2.13.1
+# tensorflow==2.13.0
+# numpy==1.24.4
