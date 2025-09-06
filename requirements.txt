@@ -2,7 +2,9 @@
 Flask
 Flask-Cors
 gunicorn
-deepface
 haversine
-tensorflow # deepface often needs this explicitly
 opencv-python
+deepface
+tf_keras
+keras==2.15.0
+tensorflow==2.15.0
