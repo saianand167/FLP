@@ -8,4 +8,4 @@ deepface
 tf-keras
 keras==2.13.1
 tensorflow==2.13.0
-numpy==1.24.4
+numpy
